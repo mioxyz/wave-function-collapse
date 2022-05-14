@@ -7,6 +7,7 @@ class Cell {
    pos_y: number;
    crowded: number; // aka "mature neightbor count", aka "differentiated neightboring cell count"
    prob: Array<number>;
+   probLength: number;
    neighbors: Array<Cell>;
    game: Game;
 
@@ -14,6 +15,7 @@ class Cell {
       this.pos_x = pos_x;
       this.pos_y = pos_y;
       this.prob = new Array<number>(probLength).fill(1.0);
+      this.probLength = probLength;
       this.idx = (idx) ? idx : 0;
       this.game = game;
       this.crowded = 0;
@@ -34,6 +36,14 @@ class Cell {
          }
       });
    }
+
+   clear():void {
+      this.idx = 0;
+      this.crowded = 0;
+      for(let k = 0;k < this.probLength; ++k) this.prob[k] = 1.0;
+      console.log(this);
+   }
+
 }
 
 class Game {
@@ -51,7 +61,7 @@ class Game {
 
    // prev: Cell;                    // previously collapsed cell
 
-   line:string; 
+   line:string;
 
    constructor(width: number = 25, height: number = 25, tileset: Array<string>, probMap: Array<Array<number>> = null)
    {
@@ -115,7 +125,7 @@ class Game {
       }
    }
 
-   draw(): void {      
+   draw(): void {
       // console.log(this.line);
       this.board.forEach(row => console.log("|" + row.map(cell => this.tileset[cell.idx]).join("") + "|"));
    }
@@ -132,10 +142,18 @@ class Game {
       console.log(`${this.probMap.map(row => row.join(",")).join("\\;")} "${escaped}"`);
    }
 
-   getRandomCell() {
+   getRandomCell():Cell {
       return this.cells[Math.floor(Math.random() * this.cells.length)];
    }
 
+   clearBoard():void {
+      this.cells.forEach( cell => cell.clear() );
+      // this.border = new Set<Cell>();
+      this.border.clear();
+      const nucleus = this.getRandomCell();
+      nucleus.collapse(Math.floor(Math.random() * this.tileset.length));
+
+   }
 
 }
 
@@ -156,17 +174,17 @@ function buildProbabilityMap(tilesetLength: number): Array<Array<number>> {
 
 
 function zipMultiply(recipient, donor) {
-	try {
-		for (let k = 0; k < recipient.length; ++k)
-			recipient[k] *= donor[k];
-	} catch (error) {
+   try {
+      for (let k = 0; k < recipient.length; ++k)
+         recipient[k] *= donor[k];
+   } catch (error) {
       if(!recipient) throw new Error("no recipient!");
       if(!donor) throw new Error("no donor!");
-		if (recipient.length != donor.length) {
-			throw new Error("recipient and donor lengths need to be the same!");
-		}
-		throw error;
-	}
+      if (recipient.length != donor.length) {
+         throw new Error("recipient and donor lengths need to be the same!");
+      }
+      throw error;
+   }
 }
 
 
@@ -184,6 +202,24 @@ function rollIdx(prob)
 
    return idx;
 }
+
+
+function stepLeastCrowded(game:Game)
+{
+   let mostCrowded = 0;
+   let mostCrowdedCell = null;
+   game.border.forEach( function(cell) {
+      if((0 != cell.crowded) && (cell.crowded < mostCrowded))
+      {
+         mostCrowdedCell = cell;
+         mostCrowded = cell.crowded;
+      }
+   });
+   if(!mostCrowdedCell) return false;
+   mostCrowdedCell.collapse( rollIdx(mostCrowdedCell.prob) );
+   return true;
+}
+
 
 
 function step(game:Game)
@@ -216,7 +252,7 @@ function parseParams(game) {
          console.log("LOADED tileset", game.tileset);
       }
    }
-   
+
 }
 
 
@@ -229,7 +265,13 @@ function main() {
    nucleus.collapse(Math.floor(Math.random() * tileset.length));
    game.execute(step, 50000, 0);
    game.draw();
+   game.clearBoard();
+   game.draw();
+   game.execute(stepLeastCrowded, 50000, 0);
+   console.log("---");
+   game.draw();
    game.printRule();
+   console.log("changed");
 }
 
 
